@@ -11,6 +11,8 @@ use crate::state::tab::Tab;
 use crate::ui::preview::PreviewContent;
 use crate::vfs::watcher::FsWatcher;
 
+use ratatui_image::picker::Picker;
+
 /// The kind of input prompt currently displayed.
 #[derive(Debug, Clone)]
 pub enum InputPrompt {
@@ -83,10 +85,13 @@ pub struct App {
 
     /// Filesystem watcher — monitors the current directory for external changes.
     fs_watcher: Option<FsWatcher>,
+
+    /// Image protocol picker.
+    pub picker: Option<Picker>,
 }
 
 impl App {
-    pub fn new(start_dir: PathBuf, action_tx: UnboundedSender<Action>, fs_watcher: Option<FsWatcher>) -> Self {
+    pub fn new(start_dir: PathBuf, action_tx: UnboundedSender<Action>, fs_watcher: Option<FsWatcher>, picker: Option<Picker>) -> Self {
         let tab = Tab::new(start_dir);
 
         Self {
@@ -111,6 +116,7 @@ impl App {
             last_preview_path: None,
             preview_cancel: None,
             fs_watcher,
+            picker,
         }
     }
 
@@ -180,7 +186,14 @@ impl App {
             let cancel = CancellationToken::new();
             self.preview_cancel = Some(cancel.clone());
             let show_hidden = self.show_hidden;
-            tokio::spawn(crate::vfs::scanner::load_preview(path, tx, cancel, show_hidden));
+            let picker = self.picker.clone();
+            tokio::spawn(crate::vfs::scanner::load_preview(
+                path,
+                tx,
+                cancel,
+                show_hidden,
+                picker,
+            ));
         } else {
             self.tab_mut().preview_content = PreviewContent::Empty;
         }

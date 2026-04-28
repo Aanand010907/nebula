@@ -84,7 +84,11 @@ async fn main() -> anyhow::Result<()> {
         Ok(w) => Some(w),
         Err(_) => None, // Graceful degradation — no live reload if watcher fails
     };
-    let mut app = App::new(start_dir, action_tx.clone(), fs_watcher);
+    
+    // Initialize image picker for ratatui-image
+    let picker = ratatui_image::picker::Picker::from_query_stdio().ok();
+    
+    let mut app = App::new(start_dir, action_tx.clone(), fs_watcher, picker);
 
     // Start the event handler
     let mut event_handler = EventHandler::new(50); // ~20 ticks/sec

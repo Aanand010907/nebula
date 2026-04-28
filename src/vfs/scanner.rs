@@ -49,6 +49,7 @@ pub async fn load_preview(
     tx: UnboundedSender<Action>,
     cancel: CancellationToken,
     show_hidden: bool,
+    picker: Option<ratatui_image::picker::Picker>,
 ) {
     use crate::ui::preview::PreviewContent;
 
@@ -97,8 +98,49 @@ pub async fn load_preview(
         // Broken symlink
         PreviewContent::Error("Broken symlink — target does not exist".to_string())
     } else {
-        // File selected — blank pane (no file content preview)
-        PreviewContent::Empty
+        // File selected — check if it's an image
+        let is_image = path.extension().and_then(|e| e.to_str()).map_or(false, |ext| {
+            matches!(
+                ext.to_lowercase().as_str(),
+                "jpg" | "jpeg" | "png" | "webp" | "gif" | "bmp" | "ico" | "tiff"
+            )
+        });
+
+        if is_image {
+            if let Some(mut picker) = picker {
+                let img_path = path.clone();
+                let cancel_clone = cancel.clone();
+                
+                // Decode image in a blocking task so we don't block the async runtime
+                let result = tokio::task::spawn_blocking(move || {
+                    if cancel_clone.is_cancelled() {
+                        return None;
+                    }
+                    
+                    let dyn_img = image::open(&img_path).ok()?;
+                    
+                    if cancel_clone.is_cancelled() {
+                        return None;
+                    }
+                    
+                    Some(picker.new_resize_protocol(dyn_img))
+                })
+                .await;
+
+                match result {
+                    Ok(Some(protocol)) => {
+                        use std::sync::{Arc, Mutex};
+                        use crate::ui::preview::ImageProtocol;
+                        PreviewContent::Image(ImageProtocol(Arc::new(Mutex::new(protocol))))
+                    }
+                    _ => PreviewContent::Empty,
+                }
+            } else {
+                PreviewContent::Empty
+            }
+        } else {
+            PreviewContent::Empty
+        }
     };
 
     // Final cancellation check before sending

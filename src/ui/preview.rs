@@ -1,16 +1,31 @@
 use ratatui::layout::{Alignment, Rect};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, BorderType, Borders, List, ListItem, Paragraph};
+use ratatui::widgets::{Block, BorderType, Borders, List, ListItem, Paragraph, StatefulWidget};
 use ratatui::Frame;
+
+use ratatui_image::StatefulImage;
+use ratatui_image::protocol::StatefulProtocol;
+use std::sync::{Arc, Mutex};
 
 use crate::app::App;
 use crate::theme::palette::Palette;
 use crate::vfs::entry::FileEntry;
 
+#[derive(Clone)]
+pub struct ImageProtocol(pub Arc<Mutex<StatefulProtocol>>);
+
+impl std::fmt::Debug for ImageProtocol {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ImageProtocol(..)")
+    }
+}
+
 /// Preview content types for the right column.
 #[derive(Debug, Clone)]
 pub enum PreviewContent {
+    /// Decoded image ready to render via ratatui-image
+    Image(ImageProtocol),
     /// Directory listing preview.
     Directory(Vec<FileEntry>),
     /// Empty / nothing selected or file selected (blank pane).
@@ -98,6 +113,16 @@ pub fn render(frame: &mut Frame, app: &mut App, area: Rect) {
             ]);
 
             let paragraph = Paragraph::new(content).block(block);
+            frame.render_widget(paragraph, area);
+        }
+
+        PreviewContent::Image(ref protocol) => {
+            if let Ok(mut state) = protocol.0.lock() {
+                let image_widget = StatefulImage::new();
+                frame.render_stateful_widget(image_widget, block.inner(area), &mut *state);
+            }
+            // Render the borders around the image
+            let paragraph = Paragraph::new("").block(block);
             frame.render_widget(paragraph, area);
         }
 
