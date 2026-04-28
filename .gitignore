@@ -1,0 +1,18 @@
+# Build artifacts
+/target/
+
+# Editor & IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Rust specific
+**/*.rs.bk
+
+# Environment
+.env
+.env.local
